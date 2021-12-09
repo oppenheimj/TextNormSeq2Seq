@@ -72,7 +72,12 @@ class LuongAttnDecoderRNN(nn.Module):
         if self.opt.attention:
             attention_scores = torch.bmm(decoder_output, self.W_a(encoder_outputs).transpose(0,1).transpose(1,2))
             attention_mask = lib.metric.sequence_mask(src_lens).unsqueeze(1)
-            attention_scores.data.masked_fill_(1 - attention_mask.data, -float('inf'))
+            
+            # attention_scores.data.masked_fill_(1 - attention_mask.data, -float('inf'))
+            attention_scores.data.masked_fill_(attention_mask.data.logical_not(), -float('inf'))
+
+            
+            
             attention_weights = F.softmax(attention_scores.squeeze(1), dim=1).unsqueeze(1)
             context_vector = torch.bmm(attention_weights, encoder_outputs.transpose(0,1))
             concat_input = torch.cat([context_vector, decoder_output], -1)
@@ -150,8 +155,17 @@ class Seq2Seq(nn.Module):
             prob, token_ids = decoder_output.data.topk(1)
             token_ids = token_ids.squeeze()
             prob = prob.squeeze()
-            preds[t,:] = token_ids
-            probs[t,:] = prob
+
+            
+            # Added these for py main.py -gpu 0
+            token_ids_cpu = token_ids.cpu().data.numpy()
+            prob_cpu = prob.cpu().data.numpy()
+
+            preds[t,:] = token_ids_cpu
+            probs[t,:] = prob_cpu
+            
+            # preds[t,:] = token_ids
+            # probs[t,:] = prob
             input_seq = Variable(token_ids)
             if np.sum(np.equal(token_ids.cpu().numpy(),end_of_batch_pred)) == len(src):
                 break
